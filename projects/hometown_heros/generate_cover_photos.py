@@ -20,7 +20,8 @@ def generate_cover_photo(
     headshot_path: str,
     talk_title: str,
     presenter: str,
-    affiliation: str
+    affiliation: str,
+    job_title: str = ""
 ) -> None:
     """
     Generate a cover photo using the HTML template.
@@ -32,6 +33,7 @@ def generate_cover_photo(
         talk_title: Title of the talk
         presenter: Name of the presenter
         affiliation: Presenter's affiliation
+        job_title: Presenter's job title (optional)
     """
     # Load the template
     with open(template_path, 'r') as f:
@@ -49,6 +51,7 @@ def generate_cover_photo(
         talk_title=talk_title,
         presenter=presenter,
         affiliation=affiliation,
+        job_title=job_title,
         headshot_base64=f"data:image/jpeg;base64,{headshot_base64}"
     )
     
@@ -123,10 +126,23 @@ def generate_cover_photos(
             headshot_path=headshot_path,
             talk_title=talk['talk_title'],
             presenter=talk['presenter'],
-            affiliation=talk['affiliation']
+            affiliation=talk['affiliation'],
+            job_title=talk.get('job_title', '')
         )
         print(f"Generated cover photo for {talk['presenter']}")
     
+
+def get_affiliation(row) -> str:
+    if pd.notna(row['Job Title (optional)']) and pd.notna(row['Affiliation']):
+        if len(row['Job Title (optional)']) > 30:
+            return  f"{row['Job Title (optional)']}\n@ {row['Affiliation']}"
+        return f"{row['Job Title (optional)']}" + f"@ {row['Affiliation']}" if row['Afilliation'] else ""
+    elif pd.notna(row['Job Title (optional)']):
+        return row['Job Title (optional)']
+    elif pd.notna(row['Affiliation']):
+        return row['Affiliation']
+    else:
+        return ""
 
 if __name__ == "__main__":
     # Example usage
@@ -139,27 +155,49 @@ if __name__ == "__main__":
     
     talks = []
     for _, row in df.iterrows():
+        if "Chris" not in row["Presenter"]:
+            continue
 
         if pd.notna(row['headshot']):
+
+            if pd.notna(row['Job Title (optional)']) and pd.notna(row['Affiliation']):
+                if row['Affiliation'] == " ":
+                    affiliation = f"{row['Job Title (optional)']}"
+                else:
+                    affiliation = f"{row['Job Title (optional)']} @ {row['Affiliation']}"
+            elif pd.notna(row['Job Title (optional)']):
+                affiliation = row['Job Title (optional)']
+            elif pd.notna(row['Affiliation']):
+                affiliation = row['Affiliation']
+            else:
+                affiliation = ""
+
             talks.append({
                 "headshot_filename": row['headshot'],
                 "talk_title": row['Talk Title'],
                 "presenter": row['Presenter'],
-                "affiliation": row['Affiliation'] if pd.notna(row['Affiliation']) else ""
+                "affiliation": affiliation,
             })
 
 
         # do the same for all second presenters
         if pd.notna(row['Second Presenter']):
+            if pd.notna(row['Second Presenter Job Title']) and pd.notna(row['Second Presenter Affiliation']):
+                affiliation = f"{row['Second Presenter Job Title']} @ {row['Second Presenter Affiliation']}"
+            elif pd.notna(row['Second Presenter Job Title']):
+                affiliation = row['Second Presenter Job Title']
+            elif pd.notna(row['Second Presenter Affiliation']):
+                affiliation = row['Second Presenter Affiliation']
+            else:
+                affiliation = ""
             talks.append({
                 "headshot_filename": row['Second Presenter Headshot'],
                 "talk_title": row['Talk Title'],
                 "presenter": row['Second Presenter'],
-                "affiliation": row['Affiliation'] if pd.notna(row['Affiliation']) else ""
+                "affiliation": affiliation,
             })
 
 
         
     # break
     generate_cover_photos(template_path, output_dir, headshot_dir, talks)
-
